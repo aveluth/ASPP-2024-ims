@@ -80,7 +80,7 @@ def pwhash(pass_text, salt):
 
 if __name__ == '__main__':
     # ask for credentials
-    in_username, in_password = get_credentials()
+    in_username, password = get_credentials()
 
     # if the database does not exist yet, create an empty one by default
     if not PWDB_DEFAULTPATH.exists():
@@ -90,13 +90,13 @@ if __name__ == '__main__':
     pwdb = read_pwdb(PWDB_DEFAULTPATH)
 
     # try to authenticate
-    if authenticate(in_username, in_password, pwdb):
+    if authenticate(in_username, password, pwdb):
         print('Successfully authenticated!')
     elif in_username not in pwdb:
         # if the user is not known, ask if a new user must be added
         ans = input('Create new user [y/n]? ')
         if ans == 'y':
-            add_user(in_username, in_password, pwdb, PWDB_DEFAULTPATH)
+            add_user(in_username, password, pwdb, PWDB_DEFAULTPATH)
     else:
         # report wrong password
         err('Wrong password!', 1)
