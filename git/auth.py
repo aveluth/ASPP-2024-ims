@@ -5,16 +5,24 @@ import random
 import string
 import sys
 import tempfile
+import hashlib
 
 # name of the file where we store the pw database
 PWDB_FLNAME = pathlib.Path('pwdb.json')
 
 # the pw database will be stored in the local directory
-PWDB_DEFAULTPATH =  PWDB_FLNAME
+PWDB_DEFAULTPATH = PWDB_FLNAME
+
+
+def get_salt():
+    # use the random library to return a random 4 char string
+    return ''.join(random.choices(string.ascii_letters + string.digits, k=4))
+
 
 def err(text, status):
     sys.stderr.write(f'{sys.argv[0]}: {text}!\n')
     sys.exit(status)
+
 
 def get_credentials():
     # get input from terminal
@@ -22,23 +30,27 @@ def get_credentials():
     # get password using the appropriate module, so that typed characters are not
     # echoed to the terminal
     password = getpass.getpass('Enter your password: ')
-    return (username, password)
+    return username, password
+
 
 def authenticate(username, pass_text, pwdb):
     success = False
     if username in pwdb:
         # compare with stored password
-        if pass_text == pwdb[username]:
+        if pwdb[username]['password'] == pwhash(pass_text, pwdb[username]['salt']):
             success = True
     return success
+
 
 def add_user(username, password, pwdb, pwdb_path):
     # do not try to add a username twice
     if username in pwdb:
         err(f'Username already exists [{username}]', 2)
     else:
-        pwdb[username] = password
+        salt = get_salt()
+        pwdb[username] = {'password': pwhash(password, salt), 'salt': salt}
         write_pwdb(pwdb, pwdb_path)
+
 
 def read_pwdb(pwdb_path):
     # try to read from the database
@@ -54,13 +66,21 @@ def read_pwdb(pwdb_path):
         err(f'Error reading {pwdb_path}: {exc}', 4)
     return pwdb
 
+
 def write_pwdb(pwdb, pwdb_path):
     with open(pwdb_path, 'wt') as pwdb_file:
         json.dump(pwdb, pwdb_file)
 
+
+def pwhash(pass_text, salt):
+    # encode to bytes
+    bpass = (pass_text + salt).encode('utf8')
+    return hashlib.sha256(bpass).hexdigest()
+
+
 if __name__ == '__main__':
     # ask for credentials
-    username, password = get_credentials()
+    in_username, in_password = get_credentials()
 
     # if the database does not exist yet, create an empty one by default
     if not PWDB_DEFAULTPATH.exists():
@@ -70,13 +90,13 @@ if __name__ == '__main__':
     pwdb = read_pwdb(PWDB_DEFAULTPATH)
 
     # try to authenticate
-    if authenticate(username, password, pwdb):
+    if authenticate(in_username, in_password, pwdb):
         print('Successfully authenticated!')
-    elif username not in pwdb:
+    elif in_username not in pwdb:
         # if the user is not known, ask if a new user must be added
         ans = input('Create new user [y/n]? ')
         if ans == 'y':
-            add_user(username, password, pwdb, PWDB_DEFAULTPATH)
+            add_user(in_username, in_password, pwdb, PWDB_DEFAULTPATH)
     else:
         # report wrong password
         err('Wrong password!', 1)
